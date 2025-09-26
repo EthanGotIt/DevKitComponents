@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: devkit-component-test-app
+  profiles:
+    active: dev

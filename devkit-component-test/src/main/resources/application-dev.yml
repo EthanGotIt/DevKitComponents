@@ -1,0 +1,15 @@
+server:
+  port: 9090
+
+devkit:
+  component:
+    config:
+      system: test-system
+      register:
+        port: 6379
+        host: 127.0.0.1
+
+logging:
+  level:
+    root: info
+  config: classpath:logback-spring.xml

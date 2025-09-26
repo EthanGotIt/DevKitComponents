@@ -1,0 +1,1 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=devkit.component.dynamic.config.center.config.DynamicConfigCenterRegisterAutoConfig,devkit.component.dynamic.config.center.config.DynamicConfigCenterAutoConfig
