@@ -1,4 +1,4 @@
-package devkit.component.test;
+package devkit.component.dynamic.config.center.test;
 
 import devkit.component.dynamic.config.center.domain.model.valobj.AttributeVO;
 import devkit.component.dynamic.config.center.types.annotations.DCCValue;

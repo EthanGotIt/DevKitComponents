@@ -11,6 +11,7 @@
     <modules>
         <module>devkit-component-dynamic-config-center</module>
         <module>devkit-component-test</module>
+        <module>devkit-component-rate-limiter</module>
     </modules>
 
     <properties>
