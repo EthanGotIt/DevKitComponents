@@ -12,6 +12,7 @@
         <module>devkit-component-dynamic-config-center</module>
         <module>devkit-component-test</module>
         <module>devkit-component-rate-limiter</module>
+        <module>devkit-component-task-job</module>
     </modules>
 
     <properties>

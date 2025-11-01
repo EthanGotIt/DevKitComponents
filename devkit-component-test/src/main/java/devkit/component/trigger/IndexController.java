@@ -17,7 +17,7 @@ public class IndexController {
      * curl --request GET \
      *   --url 'http://127.0.0.1:9090/api/v1/index/draw?userId=ethan'
      */
-    @RateLimiterAccessInterceptor(key = "userId", fallbackMethod = "drawErrorRateLimiter", permitsPerSecond = 1.0d, blacklistCount = 1)
+    @RateLimiterAccessInterceptor(key = "userId", fallbackMethod = "drawErrorRateLimiter", permitsPerSecond = 0.5d, blacklistCount = 1)
     @RequestMapping(value = "draw", method = RequestMethod.GET)
     public String draw(String userId) {
         return "test";

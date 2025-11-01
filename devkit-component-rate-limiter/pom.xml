@@ -52,18 +52,12 @@
             <artifactId>guava</artifactId>
             <version>32.1.3-jre</version>
         </dependency>
-        <dependency>
-            <groupId>cn.bugstack.wrench</groupId>
-            <artifactId>xfg-wrench-starter-dynamic-config-center</artifactId>
-            <version>1.0</version>
-            <scope>provided</scope>
-        </dependency>
 
         <dependency>
             <groupId>cn.ethan.component</groupId>
             <artifactId>devkit-component-dynamic-config-center</artifactId>
             <version>1.0</version>
-            <scope>compile</scope>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 
