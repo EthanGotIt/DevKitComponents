@@ -7,16 +7,16 @@ import java.lang.annotation.*;
 @Documented
 public @interface RateLimiterAccessInterceptor {
 
-    /** 用哪个字段作为拦截标识，未配置则默认走全部 */
+    /** Key to identify subject; default "all" */
     String key() default "all";
 
-    /** 限制频次（每秒请求次数） */
+    /** Requests per second */
     double permitsPerSecond();
 
-    /** 黑名单拦截（多少次限制后加入黑名单）0 不限制 */
+    /** Blacklist threshold; 0 disables */
     double blacklistCount() default 0;
 
-    /** 拦截后的执行方法 */
+    /** Fallback method name */
     String fallbackMethod();
 
 }

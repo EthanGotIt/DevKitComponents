@@ -14,9 +14,7 @@ public class TaskJob {
         this.taskJobService = taskJobService;
     }
 
-    /**
-     * 定时刷新任务调度配置
-     */
+    /** Periodic refresh */
     @Scheduled(fixedRateString = "${devkit.component.task.job.refresh-interval:60000}")
     public void refreshTasks() {
         if (!properties.isEnabled()) {
@@ -25,9 +23,7 @@ public class TaskJob {
         taskJobService.refreshTasks();
     }
 
-    /**
-     * 定时清理无效任务
-     */
+    /** Periodic clean */
     @Scheduled(cron = "${devkit.component.task.job.clean-invalid-tasks-cron:0 0/10 * * * ?}")
     public void cleanInvalidTasks() {
         if (!properties.isEnabled()) {

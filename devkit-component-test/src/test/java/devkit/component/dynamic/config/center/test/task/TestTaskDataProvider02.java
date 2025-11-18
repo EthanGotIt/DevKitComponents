@@ -20,22 +20,22 @@ public class TestTaskDataProvider02 implements ITaskDataProvider {
     public List<TaskScheduleVO> queryAllValidTaskSchedule() {
         List<TaskScheduleVO> tasks = new ArrayList<>();
 
-        // 另一个函数式编程示例
+        // Task 2: functional
         TaskScheduleVO task2 = new TaskScheduleVO();
         task2.setId(2L);
-        task2.setDescription("测试任务2 - 报表生成");
-        task2.setCronExpression("0/10 * * * * ?"); // 每10秒钟执行一次
+        task2.setDescription("task-2 report");
+        task2.setCronExpression("0/10 * * * * ?");
         task2.setTaskParam("{\"report_type\":\"daily\",\"format\":\"pdf\"}");
         
-        // 使用BiConsumer方式设置任务逻辑
+        // BiConsumer logic
         BiConsumer<Long, String> task2Logic = (taskId, taskParam) -> {
-            log.info("执行测试任务2 - 任务ID: {}, 任务参数: {}", taskId, taskParam);
+            log.info("run task-2, id: {}, param: {}", taskId, taskParam);
             try {
-                Thread.sleep(1000); // 模拟耗时操作
-                log.info("测试任务2执行完成");
+                Thread.sleep(1000);
+                log.info("task-2 done");
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                log.error("测试任务2执行被中断", e);
+                log.error("task-2 interrupted", e);
             }
         };
         task2.setTaskLogic(task2Logic);
@@ -46,7 +46,7 @@ public class TestTaskDataProvider02 implements ITaskDataProvider {
 
     @Override
     public List<Long> queryAllInvalidTaskScheduleIds() {
-        // 返回一些无效的任务ID用于测试
+        // Invalid IDs for testing
         return Arrays.asList(999L, 1000L);
     }
 

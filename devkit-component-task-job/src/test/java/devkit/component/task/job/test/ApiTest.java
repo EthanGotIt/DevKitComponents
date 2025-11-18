@@ -14,7 +14,7 @@ public class ApiTest {
 
     @Test
     public void test() throws InterruptedException {
-        // 初始化任务调度器
+        // Init scheduler
         ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
         scheduler.setPoolSize(5);
         scheduler.setThreadNamePrefix("test-task-scheduler-");
@@ -22,10 +22,10 @@ public class ApiTest {
         scheduler.setAwaitTerminationSeconds(30);
         scheduler.initialize();
 
-        // 添加任务
+        // Add task
         scheduler.schedule(() -> log.info("123"), new CronTrigger("0/3 * * * * ?"));
 
-        // 添加任务
+        // Add task
         scheduler.schedule(() -> log.info("321"), new CronTrigger("0/3 * * * * ?"));
 
         new CountDownLatch(1).await();

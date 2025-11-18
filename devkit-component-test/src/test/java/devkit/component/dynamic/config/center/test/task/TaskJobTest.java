@@ -20,165 +20,139 @@ public class TaskJobTest {
     @Resource
     private ITaskJobService taskJobService;
 
-    /**
-     * 测试刷新任务
-     */
+    /** Refresh tasks */
     @Test
     public void testRefreshTasks() {
-        log.info("开始测试刷新任务功能");
+        log.info("Refresh test start");
         
         try {
-            // 刷新任务
             taskJobService.refreshTasks();
             
-            // 获取当前活跃任务数量
             int activeTaskCount = taskJobService.getActiveTaskCount();
-            log.info("当前活跃任务数量: {}", activeTaskCount);
+            log.info("Active: {}", activeTaskCount);
             
-            // 等待一段时间观察任务执行
-            Thread.sleep(60000); // 等待60秒，观察任务执行情况
+            // Wait
+            Thread.sleep(60000);
             
         } catch (Exception e) {
-            log.error("测试刷新任务功能失败", e);
+            log.error("Refresh test failed", e);
         }
         
-        log.info("刷新任务功能测试完成");
+        log.info("Refresh test end");
     }
 
-    /**
-     * 测试清理无效任务
-     */
+    /** Clean invalid tasks */
     @Test
     public void testCleanInvalidTasks() {
-        log.info("开始测试清理无效任务功能");
+        log.info("Clean test start");
         
         try {
-            // 先刷新任务
             taskJobService.refreshTasks();
             
             int beforeCount = taskJobService.getActiveTaskCount();
-            log.info("清理前活跃任务数量: {}", beforeCount);
+            log.info("Active before: {}", beforeCount);
             
-            // 清理无效任务
             taskJobService.cleanInvalidTasks();
             
             int afterCount = taskJobService.getActiveTaskCount();
-            log.info("清理后活跃任务数量: {}", afterCount);
+            log.info("Active after: {}", afterCount);
             
         } catch (Exception e) {
-            log.error("测试清理无效任务功能失败", e);
+            log.error("Clean test failed", e);
         }
         
-        log.info("清理无效任务功能测试完成");
+        log.info("Clean test end");
     }
 
-    /**
-     * 测试停止所有任务
-     */
+    /** Stop all */
     @Test
     public void testStopAllTasks() {
-        log.info("开始测试停止所有任务功能");
+        log.info("Stop test start");
         
         try {
-            // 先刷新任务
             taskJobService.refreshTasks();
             
             int beforeCount = taskJobService.getActiveTaskCount();
-            log.info("停止前活跃任务数量: {}", beforeCount);
+            log.info("Active before: {}", beforeCount);
             
-            // 停止所有任务
             taskJobService.stopAllTasks();
             
             int afterCount = taskJobService.getActiveTaskCount();
-            log.info("停止后活跃任务数量: {}", afterCount);
+            log.info("Active after: {}", afterCount);
             
         } catch (Exception e) {
-            log.error("测试停止所有任务功能失败", e);
+            log.error("Stop test failed", e);
         }
         
-        log.info("停止所有任务功能测试完成");
+        log.info("Stop test end");
     }
 
-    /**
-     * 测试移除任务
-     */
+    /** Remove task */
     @Test
     public void testRemoveTask() {
-        log.info("开始测试移除任务功能");
+        log.info("Remove test start");
         
         try {
-            // 先添加一个测试任务
             TaskScheduleVO testTask = new TaskScheduleVO();
-            testTask.setId(8888L);
-            testTask.setDescription("待移除的测试任务");
-            testTask.setCronExpression("0/20 * * * * ?");
-            testTask.setTaskParam("{\"message\":\"这个任务将被移除\"}");
+            testTask.setId(4L);
+            testTask.setDescription("task to remove");
+            testTask.setCronExpression("*/20 * * * * *");
+            testTask.setTaskParam("{\"message\":\"will be removed\"}");
             
-            // 设置任务执行逻辑
             testTask.setTaskLogic(() -> {
-                log.info("执行测试任务 - 任务ID: 8888, 任务参数: {}", testTask.getTaskParam());
+                log.info("Run test task id: {}, param: {}", testTask.getId(), testTask.getTaskParam());
             });
 
-            // 添加任务
             boolean addResult = taskJobService.addTask(testTask);
-            log.info("添加任务结果: {}", addResult ? "成功" : "失败");
+            log.info("Add: {}", addResult);
             
             int beforeCount = taskJobService.getActiveTaskCount();
-            log.info("移除前活跃任务数量: {}", beforeCount);
+            log.info("Active before: {}", beforeCount);
             
-            // 等待一段时间
-            Thread.sleep(30000); // 等待30秒，让任务执行一次
+            Thread.sleep(5000);
             
-            // 移除任务
-            boolean removeResult = taskJobService.removeTask(8888L);
-            log.info("移除任务结果: {}", removeResult ? "成功" : "失败");
+            boolean removeResult = taskJobService.removeTask(4L);
+            log.info("Remove: {}", removeResult);
             
             int afterCount = taskJobService.getActiveTaskCount();
-            log.info("移除后活跃任务数量: {}", afterCount);
+            log.info("Active after: {}", afterCount);
             
         } catch (Exception e) {
-            log.error("测试移除任务功能失败", e);
+            log.error("Remove test failed", e);
         }
         
-        log.info("移除任务功能测试完成");
+        log.info("Remove test end");
     }
 
-    /**
-     * 综合测试
-     */
+    /** Integration test */
     @Test
     public void testTaskJobIntegration() {
-        log.info("开始综合测试任务调度功能");
+        log.info("Integration test start");
 
         try {
-            // 1. 刷新任务
-            log.info("=== 步骤1: 刷新任务 ===");
+            // 1. Refresh
             taskJobService.refreshTasks();
-            log.info("当前活跃任务数量: {}", taskJobService.getActiveTaskCount());
+            log.info("Active: {}", taskJobService.getActiveTaskCount());
 
-            // 2. 等待任务执行
-            log.info("=== 步骤2: 等待任务执行 ===");
-            Thread.sleep(30000); // 等待30秒，让任务执行一次
+            // 2. Wait
+            Thread.sleep(3000);
 
-            // 3. 清理无效任务
-            log.info("=== 步骤3: 清理无效任务 ===");
+            // 3. Clean
             taskJobService.cleanInvalidTasks();
-            log.info("清理后活跃任务数量: {}", taskJobService.getActiveTaskCount());
+            log.info("Active: {}", taskJobService.getActiveTaskCount());
 
-            // 4. 再次等待观察
-            log.info("=== 步骤4: 继续观察任务执行 ===");
-            Thread.sleep(30000); // 再等待30秒
+            // 4. Wait again
+            Thread.sleep(3000);
 
-            // 5. 停止所有任务
-            log.info("=== 步骤5: 停止所有任务 ===");
+            // 5. Stop
             taskJobService.stopAllTasks();
-            log.info("最终活跃任务数量: {}", taskJobService.getActiveTaskCount());
+            log.info("Active: {}", taskJobService.getActiveTaskCount());
 
         } catch (Exception e) {
-            log.error("综合测试失败", e);
+            log.error("Integration test failed", e);
         }
 
-        log.info("综合测试完成");
+        log.info("Integration test end");
     }
 
 }

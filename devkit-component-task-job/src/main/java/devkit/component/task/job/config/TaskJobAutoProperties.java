@@ -9,25 +9,25 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "devkit.component.task.job", ignoreInvalidFields = true)
 public class TaskJobAutoProperties {
 
-    /** 是否启用任务调度器 */
+    /** Enable scheduler */
     private boolean enabled = true;
     
-    /** 线程池大小 */
+    /** Pool size */
     private int poolSize = 10;
     
-    /** 线程名称前缀 */
+    /** Thread name prefix */
     private String threadNamePrefix = "devkit-component-task-scheduler-";
     
-    /** 关闭时等待任务完成 */
+    /** Wait on shutdown */
     private boolean waitForTasksToCompleteOnShutdown = true;
     
-    /** 等待终止时间（秒） */
+    /** Await termination seconds */
     private int awaitTerminationSeconds = 60;
     
-    /** 任务刷新间隔（毫秒） */
+    /** Refresh interval (ms) */
     private long refreshInterval = 60000;
     
-    /** 清理无效任务的cron表达式 */
+    /** Clean invalid tasks cron */
     private String cleanInvalidTasksCron = "0 0/10 * * * ?";
 
 }

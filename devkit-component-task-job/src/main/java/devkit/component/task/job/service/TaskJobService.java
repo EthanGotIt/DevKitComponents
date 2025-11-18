@@ -23,14 +23,11 @@ public class TaskJobService implements ITaskJobService, DisposableBean {
     private final TaskScheduler taskScheduler;
     private final List<ITaskDataProvider> taskDataProviders;
 
-    /**
-     * 任务ID与任务执行器的映射，用于记录已添加的任务
-     */
+    /** Map of taskId -> scheduled future */
     private final Map<Long, ScheduledFuture<?>> scheduledTasks = new ConcurrentHashMap<>();
+    private final Set<Long> manualTaskIds = ConcurrentHashMap.newKeySet();
 
-    /**
-     * 新的构造函数，不依赖ITaskExecutor
-     */
+    /** Constructor */
     public TaskJobService(TaskScheduler taskScheduler,
                          List<ITaskDataProvider> taskDataProviders) {
         this.taskScheduler = taskScheduler;
@@ -40,24 +37,23 @@ public class TaskJobService implements ITaskJobService, DisposableBean {
     @Override
     public void initializeTasks() {
         try {
-            // 检查数据提供者列表是否为空
+            // Providers check
             if (taskDataProviders == null || taskDataProviders.isEmpty()) {
-                log.debug("没有可用的任务数据提供者，跳过初始化");
+                log.debug("No task providers, skip init");
                 return;
             }
             
-            // 聚合所有数据提供者的任务调度配置
+            // Aggregate schedules
             List<TaskScheduleVO> allTaskSchedules = aggregateTaskSchedules();
             
-            // 处理每个任务调度配置
+            // Schedule each
             for (TaskScheduleVO task : allTaskSchedules) {
-                // 创建并调度新任务
                 scheduleTask(task);
             }
             
-            log.info("任务调度配置初始化完成，加载任务数: {}", scheduledTasks.size());
+            log.info("Init complete, loaded: {}", scheduledTasks.size());
         } catch (Exception e) {
-            log.error("任务调度配置初始化失败", e);
+            log.error("Init failed", e);
         }
     }
 
@@ -68,7 +64,7 @@ public class TaskJobService implements ITaskJobService, DisposableBean {
                 return false;
             }
 
-            // 验证任务配置完整性
+            // Validate
             if (task.getCronExpression() == null || task.getCronExpression().trim().isEmpty()) {
                 return false;
             }
@@ -77,18 +73,23 @@ public class TaskJobService implements ITaskJobService, DisposableBean {
                 return false;
             }
 
-            // 如果任务已存在，先移除旧任务
+            // Remove existing if present
             if (scheduledTasks.containsKey(task.getId())) {
-                log.debug("任务已存在，先移除旧任务，taskId: {}", task.getId());
+                log.debug("Task exists, remove old, id: {}", task.getId());
                 removeTask(task.getId());
             }
 
-            // 调度新任务
-            scheduleTask(task);
+            boolean ok = scheduleTask(task);
+            if (ok) {
+                manualTaskIds.add(task.getId());
+                logActiveTaskSnapshot("addTask-success");
+            } else {
+                logActiveTaskSnapshot("addTask-failed");
+            }
 
-            return true;
+            return ok;
         } catch (Exception e) {
-            log.error("添加任务失败，taskId: {}", task.getId(), e);
+            log.error("Add failed, id: {}", task.getId(), e);
             return false;
         }
     }
@@ -103,44 +104,46 @@ public class TaskJobService implements ITaskJobService, DisposableBean {
             ScheduledFuture<?> future = scheduledTasks.remove(taskId);
             if (future != null && !future.isCancelled()) {
                 future.cancel(true);
-                log.debug("任务移除成功，taskId: {}", taskId);
+                log.debug("Removed, id: {}", taskId);
+                manualTaskIds.remove(taskId);
+                logActiveTaskSnapshot("removeTask-success");
                 return true;
             } else {
-                log.debug("任务不存在或已取消，taskId: {}", taskId);
+                log.debug("Not found or already cancelled, id: {}", taskId);
+                logActiveTaskSnapshot("removeTask-miss");
                 return false;
             }
         } catch (Exception e) {
-            log.error("移除任务失败，taskId: {}", taskId, e);
+            log.error("Remove failed, id: {}", taskId, e);
             return false;
         }
     }
 
-    /**
-     * 调度单个任务
-     */
-    private void scheduleTask(TaskScheduleVO task) {
+    /** Schedule one task */
+    @SuppressWarnings("null")
+    private boolean scheduleTask(TaskScheduleVO task) {
         try {
             if (task == null) {
-                log.error("任务配置为空，无法调度");
-                return;
+                log.error("Task config is null");
+                return false;
             }
 
             if (task.getCronExpression() == null || task.getCronExpression().trim().isEmpty()) {
-                log.error("任务Cron表达式为空，无法调度，taskId: {}", task.getId());
-                return;
+                log.error("Cron is empty, id: {}", task.getId());
+                return false;
             }
 
             if (task.getTaskExecutor() == null) {
-                log.error("任务执行器为空，无法调度，taskId: {}", task.getId());
-                return;
+                log.error("Task executor is null, id: {}", task.getId());
+                return false;
             }
 
-            log.debug("调度任务，taskId: {}, description: {}, cron: {}", 
+            log.debug("Schedule task id: {}, desc: {}, cron: {}", 
                     task.getId(), 
                     task.getDescription() != null ? task.getDescription() : "", 
                     task.getCronExpression());
 
-            // 使用新的函数式编程方式
+            // schedule with CronTrigger
             ScheduledFuture<?> future;
             try {
                 future = taskScheduler.schedule(
@@ -148,68 +151,66 @@ public class TaskJobService implements ITaskJobService, DisposableBean {
                         new CronTrigger(task.getCronExpression())
                 );
             } catch (IllegalArgumentException e) {
-                log.error("Cron表达式格式错误，无法调度任务，taskId: {}, cron: {}", task.getId(), task.getCronExpression(), e);
-                return;
+                log.error("Invalid cron, id: {}, cron: {}", task.getId(), task.getCronExpression(), e);
+                return false;
             }
 
             scheduledTasks.put(task.getId(), future);
 
-            log.debug("任务调度成功，taskId: {}", task.getId());
+            log.debug("Scheduled, id: {}", task.getId());
+            return true;
         } catch (Exception e) {
-            log.error("调度任务失败，taskId: {}", task != null ? task.getId() : "null", e);
+            log.error("Schedule failed, id: {}", task != null ? task.getId() : "null", e);
+            return false;
         }
     }
 
-    /**
-     * 使用函数式编程方式执行任务
-     */
+    /** Execute task */
     private void executeTaskWithFunction(TaskScheduleVO task) {
         try {
             if (task == null) {
-                log.error("任务配置为空，无法执行");
+                log.error("Task config is null");
                 return;
             }
 
-            log.debug("执行任务，taskId: {}, description: {}", task.getId(), task.getDescription() != null ? task.getDescription() : "");
+            log.debug("Run task id: {}, desc: {}", task.getId(), task.getDescription() != null ? task.getDescription() : "");
 
-            // 检查任务执行器是否存在
+            // Ensure executor exists
             if (task.getTaskExecutor() == null) {
-                log.error("任务执行器为空，无法执行，taskId: {}", task.getId());
+                log.error("Task executor is null, id: {}", task.getId());
                 return;
             }
 
-            // 获取并执行任务
+            // Get and run task
             Runnable taskRunnable = task.getTaskExecutor().get();
             if (taskRunnable == null) {
-                log.error("任务执行器返回的Runnable为空，无法执行，taskId: {}", task.getId());
+                log.error("Executor returned null Runnable, id: {}", task.getId());
                 return;
             }
 
             taskRunnable.run();
 
-            log.debug("任务执行完成，taskId: {}", task.getId());
+            log.debug("Task done, id: {}", task.getId());
         } catch (Exception e) {
-            log.error("执行任务失败，taskId: {}", task != null ? task.getId() : "null", e);
+            log.error("Run failed, id: {}", task != null ? task.getId() : "null", e);
         }
     }
     
     @Override
     public void refreshTasks() {
-        log.debug("刷新任务调度配置");
+        log.debug("Refresh tasks");
         try {
-            // 检查数据提供者列表是否为空
             if (taskDataProviders == null || taskDataProviders.isEmpty()) {
-                log.debug("没有可用的任务数据提供者，跳过刷新");
+                log.debug("No task providers, skip refresh");
                 return;
             }
             
-            // 聚合所有数据提供者的任务调度配置
             List<TaskScheduleVO> allTaskSchedules = aggregateTaskSchedules();
 
-            // 记录当前配置中的任务ID
+            // Current IDs
             Set<Long> currentTaskIds = new HashSet<>();
 
-            // 处理每个任务调度配置
+            // Apply schedules
             for (TaskScheduleVO task : allTaskSchedules) {
                 Long taskId = task.getId();
                 if (taskId == null) {
@@ -218,56 +219,56 @@ public class TaskJobService implements ITaskJobService, DisposableBean {
                 
                 currentTaskIds.add(taskId);
 
-                // 如果任务已经存在，则跳过
+                // Skip existing
                 if (scheduledTasks.containsKey(taskId)) {
                     continue;
                 }
 
-                // 创建并调度新任务
+                // Schedule
                 scheduleTask(task);
             }
 
-            // 移除已不存在的任务
+            currentTaskIds.addAll(manualTaskIds);
+
+            // Remove stale
             scheduledTasks.entrySet().removeIf(entry -> {
                 Long taskId = entry.getKey();
                 if (!currentTaskIds.contains(taskId)) {
                     ScheduledFuture<?> future = entry.getValue();
                     if (future != null && !future.isCancelled()) {
                         future.cancel(true);
-                        log.debug("移除过期任务，taskId: {}", taskId);
+                        log.debug("Removed stale, id: {}", taskId);
                     }
                     return true;
                 }
                 return false;
             });
 
-            log.debug("任务调度配置刷新完成，活跃任务数: {}", scheduledTasks.size());
+            log.debug("Refresh complete, active: {}", scheduledTasks.size());
         } catch (Exception e) {
-            log.error("刷新任务调度配置失败", e);
+            log.error("Refresh failed", e);
         }
     }
 
     @Override
     public void cleanInvalidTasks() {
-        log.debug("清理无效任务");
+        log.debug("Clean invalid tasks");
         try {
-            // 检查数据提供者列表是否为空
             if (taskDataProviders == null || taskDataProviders.isEmpty()) {
-                log.debug("没有可用的任务数据提供者，跳过清理无效任务");
+                log.debug("No task providers, skip clean");
                 return;
             }
             
-            // 聚合所有数据提供者的无效任务ID
             List<Long> allInvalidTaskIds = aggregateInvalidTaskIds();
             
             if (allInvalidTaskIds.isEmpty()) {
-                log.debug("没有发现无效的任务需要清理");
+                log.debug("No invalid tasks");
                 return;
             }
             
-            log.info("发现 {} 个无效任务需要清理", allInvalidTaskIds.size());
+            log.info("Found {} invalid tasks", allInvalidTaskIds.size());
             
-            // 从调度器中移除这些任务
+            // Remove them
             for (Long taskId : allInvalidTaskIds) {
                 if (taskId == null) {
                     continue;
@@ -275,13 +276,13 @@ public class TaskJobService implements ITaskJobService, DisposableBean {
                 ScheduledFuture<?> future = scheduledTasks.remove(taskId);
                 if (future != null && !future.isCancelled()) {
                     future.cancel(true);
-                    log.debug("移除无效任务，taskId: {}", taskId);
+                    log.debug("Removed invalid, id: {}", taskId);
                 }
             }
             
-            log.info("无效任务清理完成，活跃任务数: {}", scheduledTasks.size());
+            log.info("Clean complete, active: {}", scheduledTasks.size());
         } catch (Exception e) {
-            log.error("清理无效任务失败", e);
+            log.error("Clean failed", e);
         }
     }
 
@@ -293,6 +294,7 @@ public class TaskJobService implements ITaskJobService, DisposableBean {
             }
         });
         scheduledTasks.clear();
+        manualTaskIds.clear();
     }
 
     @Override
@@ -335,7 +337,7 @@ public class TaskJobService implements ITaskJobService, DisposableBean {
             }
             List<Long> invalidTaskIds = provider.queryAllInvalidTaskScheduleIds();
             if (invalidTaskIds != null) {
-                // 过滤掉 null 值
+                // filter out null
                 for (Long taskId : invalidTaskIds) {
                     if (taskId != null) {
                         allInvalidTaskIds.add(taskId);
@@ -346,4 +348,13 @@ public class TaskJobService implements ITaskJobService, DisposableBean {
         return allInvalidTaskIds;
     }
 
+    private void logActiveTaskSnapshot(String scene) {
+        try {
+            log.debug("Snapshot[{}] active: {}", scene, scheduledTasks.size());
+            if (!scheduledTasks.isEmpty()) {
+                log.debug("Snapshot[{}] ids: {}", scene, scheduledTasks.keySet());
+            }
+        } catch (Exception ignored) {
+        }
+    }
 }

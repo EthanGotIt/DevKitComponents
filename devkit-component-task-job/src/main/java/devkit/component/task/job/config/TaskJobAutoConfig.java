@@ -20,9 +20,7 @@ import java.util.List;
 @ConditionalOnProperty(prefix = "devkit.component.task.job", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class TaskJobAutoConfig {
 
-    /**
-     * 创建线程池任务调度器实例，用于执行定时任务和异步任务调度
-     */
+    /** Task scheduler */
     @Bean("devkitComponentTaskScheduler")
     public TaskScheduler taskScheduler(TaskJobAutoProperties properties) {
         ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
@@ -37,16 +35,14 @@ public class TaskJobAutoConfig {
 
     @Bean
     public ITaskJobService taskJobService(TaskScheduler devkitComponentTaskScheduler, List<ITaskDataProvider> taskDataProviders) {
-        // 实例化任务并初始化调度
+        // Init schedules
         TaskJobService taskJobService = new TaskJobService(devkitComponentTaskScheduler, taskDataProviders);
         taskJobService.initializeTasks();
 
         return taskJobService;
     }
 
-    /**
-     * 自动检测任务
-     */
+    /** Scheduled maintenance */
     @Bean
     public TaskJob taskJob(TaskJobAutoProperties properties, ITaskJobService taskJobService) {
         return new TaskJob(properties, taskJobService);

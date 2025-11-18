@@ -29,12 +29,12 @@ public class RateLimiterAOP {
     @DCCValue("rateLimiterSwitch:open")
     private String rateLimiterSwitch = "open";
 
-    // 个人限频记录1分钟
+    // Per-user rate cache, 1 minute
     private final Cache<String, RateLimiter> loginRecord = CacheBuilder.newBuilder()
             .expireAfterWrite(1, TimeUnit.MINUTES)
             .build();
 
-    // 个人限频黑名单24h - 分布式业务场景，可以记录到 Redis 中
+    // Blacklist, 24 hours
     private final Cache<String, Long> blacklist = CacheBuilder.newBuilder()
             .expireAfterWrite(24, TimeUnit.HOURS)
             .build();
@@ -45,9 +45,9 @@ public class RateLimiterAOP {
 
     @Around("aopPoint() && @annotation(rateLimiterAccessInterceptor)")
     public Object doRouter(ProceedingJoinPoint jp, RateLimiterAccessInterceptor rateLimiterAccessInterceptor) throws Throwable {
-        // 0. 限流开关【open 开启、close 关闭】关闭后，不会走限流策略
+        // Switch: open/close
         if (StringUtils.isBlank(rateLimiterSwitch) || "close".equals(rateLimiterSwitch)) {
-            log.debug("限流开关已关闭，跳过限流检查");
+            log.debug("Rate limit disabled");
             return jp.proceed();
         }
 
@@ -55,78 +55,76 @@ public class RateLimiterAOP {
         if (StringUtils.isBlank(key)) {
             throw new RuntimeException("annotation RateLimiter key is null！");
         }
-        // 获取拦截字段
+        // Resolve key attr
         String keyAttr = getAttrValue(key, jp.getArgs());
         if (StringUtils.isBlank(keyAttr)) {
             return jp.proceed();
         }
-        log.debug("限流检查，key: {}, keyAttr: {}, method: {}", key, keyAttr, jp.getSignature().toShortString());
+        log.debug("Rate limit check key: {}, attr: {}, method: {}", key, keyAttr, jp.getSignature().toShortString());
 
-        // 黑名单拦截
+        // Blacklist check
         if (!"all".equals(keyAttr) && rateLimiterAccessInterceptor.blacklistCount() != 0) {
             Long blacklistCount = blacklist.getIfPresent(keyAttr);
             if (blacklistCount != null && blacklistCount > rateLimiterAccessInterceptor.blacklistCount()) {
-                log.info("限流拦截：黑名单用户，keyAttr: {}, 拦截时长: 24h", keyAttr);
+                log.info("Blocked: blacklisted, attr: {}", keyAttr);
                 try {
                     return fallbackMethodResult(jp, rateLimiterAccessInterceptor.fallbackMethod());
                 } catch (Exception e) {
-                    log.error("调用限流回调方法失败，fallbackMethod: {}", rateLimiterAccessInterceptor.fallbackMethod(), e);
+                    log.error("Fallback failed, method: {}", rateLimiterAccessInterceptor.fallbackMethod(), e);
                     throw e;
                 }
             }
         }
 
-        // 获取限流 -> Guava 缓存1分钟
+        // Build limiter (cached)
         RateLimiter rateLimiter = loginRecord.getIfPresent(keyAttr);
         if (null == rateLimiter) {
             rateLimiter = RateLimiter.create(rateLimiterAccessInterceptor.permitsPerSecond());
             loginRecord.put(keyAttr, rateLimiter);
-            log.debug("创建限流器，keyAttr: {}, permitsPerSecond: {}", keyAttr, rateLimiterAccessInterceptor.permitsPerSecond());
+            log.debug("Create limiter, attr: {}, rps: {}", keyAttr, rateLimiterAccessInterceptor.permitsPerSecond());
         }
 
-        // 限流拦截
+        // Try acquire
         boolean acquired = rateLimiter.tryAcquire();
-        log.debug("限流器尝试获取许可，keyAttr: {}, acquired: {}, permitsPerSecond: {}", keyAttr, acquired, rateLimiterAccessInterceptor.permitsPerSecond());
+        log.debug("Acquire permit, attr: {}, acquired: {}, rps: {}", keyAttr, acquired, rateLimiterAccessInterceptor.permitsPerSecond());
         
         if (!acquired) {
-            log.info("限流拦截：请求超频，keyAttr: {}, 速率限制: {} 次/秒", keyAttr, rateLimiterAccessInterceptor.permitsPerSecond());
+            log.info("Blocked: rate exceeded, attr: {}, rps: {}", keyAttr, rateLimiterAccessInterceptor.permitsPerSecond());
             
-            // 记录黑名单次数
+            // Update blacklist count
             if (rateLimiterAccessInterceptor.blacklistCount() != 0) {
                 Long currentCount = blacklist.getIfPresent(keyAttr);
                 long newCount = (currentCount == null ? 0L : currentCount) + 1L;
                 blacklist.put(keyAttr, newCount);
-                log.debug("更新黑名单计数，keyAttr: {}, count: {}", keyAttr, newCount);
+                log.debug("Blacklist count updated, attr: {}, count: {}", keyAttr, newCount);
             }
             
             try {
                 return fallbackMethodResult(jp, rateLimiterAccessInterceptor.fallbackMethod());
             } catch (Exception e) {
-                log.error("调用限流回调方法失败，fallbackMethod: {}", rateLimiterAccessInterceptor.fallbackMethod(), e);
+                log.error("Fallback failed, method: {}", rateLimiterAccessInterceptor.fallbackMethod(), e);
                 throw e;
             }
         }
 
-        log.debug("限流检查通过，允许执行，keyAttr: {}", keyAttr);
-        // 返回结果
+        log.debug("Allowed, attr: {}", keyAttr);
+        // Return result
         return jp.proceed();
     }
 
-    /**
-     * 调用用户配置的回调方法，当拦截后，返回回调结果。
-     */
+    /** Invoke fallback when blocked */
     private Object fallbackMethodResult(JoinPoint jp, String fallbackMethod) throws Exception {
         if (jp == null || jp.getTarget() == null || jp.getSignature() == null) {
-            throw new IllegalArgumentException("JoinPoint 参数不完整");
+            throw new IllegalArgumentException("JoinPoint is incomplete");
         }
         
         if (fallbackMethod == null || fallbackMethod.trim().isEmpty()) {
-            throw new IllegalArgumentException("回调方法名不能为空");
+            throw new IllegalArgumentException("Fallback method is blank");
         }
         
         Signature sig = jp.getSignature();
         if (!(sig instanceof MethodSignature)) {
-            throw new IllegalArgumentException("无法获取方法签名");
+            throw new IllegalArgumentException("Not a MethodSignature");
         }
         
         MethodSignature methodSignature = (MethodSignature) sig;
@@ -134,27 +132,25 @@ public class RateLimiterAOP {
         return method.invoke(jp.getThis(), jp.getArgs());
     }
 
-    /**
-     * 实际根据自身业务调整，主要是为了获取通过某个值做拦截
-     */
+    /** Get key value by attr */
     public String getAttrValue(String attr, Object[] args) {
         if (args == null || args.length == 0) {
             return null;
         }
         
-        // 如果第一个参数是 String 类型（常见场景：Controller 方法参数是 String userId）
+        // First arg is String
         if (args[0] != null && args[0] instanceof String) {
             String value = args[0].toString();
-            log.debug("从第一个String参数获取值，attr: {}, value: {}", attr, value);
+            log.debug("Use first String arg, attr: {}, value: {}", attr, value);
             return value;
         }
         
-        // 如果 attr 是 "all"，返回 "all"
+        // If attr is "all"
         if ("all".equals(attr)) {
             return "all";
         }
         
-        // 尝试从对象参数中获取属性值
+        // Try to read field from object args
         String filedValue = null;
         for (Object arg : args) {
             if (arg == null) {
@@ -164,27 +160,20 @@ public class RateLimiterAOP {
                 if (StringUtils.isNotBlank(filedValue)) {
                     break;
                 }
-                // fix: 使用lombok时，uId这种字段的get方法与idea生成的get方法不同，会导致获取不到属性值，改成反射获取解决
+                // Use reflection to read field
                 Object value = this.getValueByName(arg, attr);
                 if (value != null) {
                     filedValue = String.valueOf(value);
                 }
             } catch (Exception e) {
-                log.debug("从对象中获取属性值失败，attr: {}, argClass: {}", attr, arg.getClass().getName(), e);
+                log.debug("Read field failed, attr: {}, class: {}", attr, arg.getClass().getName(), e);
             }
         }
         
         return filedValue;
     }
 
-    /**
-     * 获取对象的特定属性值
-     *
-     * @param item 对象
-     * @param name 属性名
-     * @return 属性值
-     * @author tang
-     */
+    /** Get a field value */
     private Object getValueByName(Object item, String name) {
         try {
             Field field = getFieldByName(item, name);
@@ -200,14 +189,7 @@ public class RateLimiterAOP {
         }
     }
 
-    /**
-     * 根据名称获取方法，该方法同时兼顾继承类获取父类的属性
-     *
-     * @param item 对象
-     * @param name 属性名
-     * @return 该属性对应方法
-     * @author tang
-     */
+    /** Get a declared field by name, including superclass */
     private Field getFieldByName(Object item, String name) {
         try {
             Field field;

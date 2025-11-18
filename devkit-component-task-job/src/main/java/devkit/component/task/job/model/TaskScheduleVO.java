@@ -8,36 +8,30 @@ import java.util.function.Supplier;
 @Data
 public class TaskScheduleVO {
 
-    /** 任务ID */
+    /** Task ID */
     private Long id;
     
-    /** 任务描述 */
+    /** Description */
     private String description;
     
-    /** Cron表达式 */
+    /** Cron */
     private String cronExpression;
     
-    /** 任务参数 */
+    /** Params */
     private String taskParam;
     
-    /** 任务执行器函数式接口 */
+    /** Executor supplier */
     private Supplier<Runnable> taskExecutor;
 
     public TaskScheduleVO() {
     }
 
-    /**
-     * 便捷方法：设置任务执行逻辑
-     * @param taskLogic 任务执行逻辑
-     */
+    /** Convenience: set task logic */
     public void setTaskLogic(Runnable taskLogic) {
         this.taskExecutor = () -> taskLogic;
     }
     
-    /**
-     * 便捷方法：设置带参数的任务执行逻辑
-     * @param taskLogic 任务执行逻辑，接收taskId和taskParam
-     */
+    /** Convenience: set logic with params */
     public void setTaskLogic(BiConsumer<Long, String> taskLogic) {
         this.taskExecutor = () -> () -> taskLogic.accept(this.id, this.taskParam);
     }

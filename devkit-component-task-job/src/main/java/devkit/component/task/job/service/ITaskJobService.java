@@ -4,45 +4,25 @@ import devkit.component.task.job.model.TaskScheduleVO;
 
 public interface ITaskJobService {
 
-    /**
-     * 添加单个任务
-     * @param task 任务调度配置
-     * @return 是否添加成功
-     */
+    /** Add a task */
     boolean addTask(TaskScheduleVO task);
 
-    /**
-     * 移除单个任务
-     *
-     * @param taskId 任务ID
-     */
+    /** Remove a task */
     boolean removeTask(Long taskId);
 
-    /**
-     * 刷新任务调度配置
-     */
+    /** Refresh task schedules */
     void refreshTasks();
     
-    /**
-     * 清理无效任务
-     */
+    /** Clean invalid tasks */
     void cleanInvalidTasks();
     
-    /**
-     * 停止所有任务
-     */
+    /** Stop all tasks */
     void stopAllTasks();
     
-    /**
-     * 获取当前活跃任务数量
-     * @return 活跃任务数量
-     */
+    /** Active task count */
     int getActiveTaskCount();
     
-    /**
-     * 初始化任务调度配置
-     * 在服务启动时加载所有有效的任务调度配置
-     */
+    /** Initialize task schedules */
     void initializeTasks();
 
 }

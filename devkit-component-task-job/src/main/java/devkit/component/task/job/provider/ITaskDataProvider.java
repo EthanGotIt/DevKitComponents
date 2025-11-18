@@ -6,16 +6,10 @@ import java.util.List;
 
 public interface ITaskDataProvider {
 
-    /**
-     * 查询所有有效的任务调度配置
-     * @return 任务调度配置列表
-     */
+    /** Query all valid task schedules */
     List<TaskScheduleVO> queryAllValidTaskSchedule();
     
-    /**
-     * 查询所有无效的任务ID
-     * @return 无效任务 ID列表
-     */
+    /** Query all invalid task IDs */
     List<Long> queryAllInvalidTaskScheduleIds();
 
 }

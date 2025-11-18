@@ -19,18 +19,17 @@ public class TestTaskDataProvider03 implements ITaskDataProvider {
     public List<TaskScheduleVO> queryAllValidTaskSchedule() {
         List<TaskScheduleVO> tasks = new ArrayList<>();
 
-        // 使用简单Runnable的示例
+        // Task 3: simple runnable
         TaskScheduleVO task3 = new TaskScheduleVO();
         task3.setId(3L);
-        task3.setDescription("测试任务3 - 清理任务");
-        task3.setCronExpression("0 0 2 * * ?"); // 每天凌晨2点执行
+        task3.setDescription("task-3 cleanup");
+        task3.setCronExpression("0 0 2 * * ?");
         task3.setTaskParam("{\"cleanup_days\":7}");
         
-        // 使用Runnable方式设置任务逻辑
+        // Runnable logic
         Runnable task3Logic = () -> {
-            log.info("执行清理任务 - 任务ID: 3");
-            // 模拟清理操作
-            log.info("清理任务执行完成");
+            log.info("run cleanup, id: 3");
+            log.info("cleanup done");
         };
 
         task3.setTaskLogic(task3Logic);
@@ -41,7 +40,7 @@ public class TestTaskDataProvider03 implements ITaskDataProvider {
 
     @Override
     public List<Long> queryAllInvalidTaskScheduleIds() {
-        // 返回一些无效的任务ID用于测试
+        // Invalid IDs for testing
         return Arrays.asList(999L, 1000L);
     }
 
